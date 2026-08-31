@@ -1,0 +1,22 @@
+# docker-compose.override.yml — Local development overrides
+# This file is automatically loaded by docker compose (alongside docker-compose.yml)
+# It adds development-specific settings without modifying the base file.
+
+services:
+  task-service:
+    environment:
+      PROCESSING_TIMEOUT: "10"
+      LOG_LEVEL: "DEBUG"
+    volumes:
+      - ./task-service:/app
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  notification-service:
+    volumes:
+      - ./notification-service:/app
+    command: ["python", "-u", "app.py"]
+
+  web-ui:
+    volumes:
+      - ./web-ui:/app
+    command: ["python", "-u", "app.py", "--debug"]

@@ -1,0 +1,62 @@
+# Environment: DEV
+environment: dev
+
+namespace:
+  name: task-management-dev
+
+images:
+  taskService:
+    tag: "1.1.0-dev"
+  notificationService:
+    tag: "1.1.0-dev"
+  webUI:
+    tag: "1.1.0-dev"
+
+replicaCount:
+  taskService: 1
+  notificationService: 1
+  webUI: 1
+  db: 1
+
+resources:
+  taskService:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+  notificationService:
+    requests:
+      cpu: "25m"
+      memory: "32Mi"
+    limits:
+      cpu: "100m"
+      memory: "96Mi"
+  webUI:
+    requests:
+      cpu: "25m"
+      memory: "32Mi"
+    limits:
+      cpu: "100m"
+      memory: "96Mi"
+  db:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+healthCheck:
+  interval: 60
+  processingTimeout: 60
+
+ingress:
+  enabled: true
+  host: task-management-dev.local
+  tls:
+    enabled: false
+
+database:
+  pvcSize: 2Gi

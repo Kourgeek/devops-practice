@@ -1,0 +1,11 @@
+# Helm chart ignore file
+*.tgz
+*.tar.gz
+.env
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+.kube/
+*.log

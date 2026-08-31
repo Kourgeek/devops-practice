@@ -1,0 +1,74 @@
+# Environment: STAGING
+environment: staging
+
+namespace:
+  name: task-management-staging
+
+images:
+  taskService:
+    tag: "1.1.0-staging"
+  notificationService:
+    tag: "1.1.0-staging"
+  webUI:
+    tag: "1.1.0-staging"
+
+replicaCount:
+  taskService: 2
+  notificationService: 2
+  webUI: 2
+  db: 1
+
+resources:
+  taskService:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  notificationService:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "192Mi"
+  webUI:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "192Mi"
+  db:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+healthCheck:
+  interval: 30
+  processingTimeout: 30
+
+ingress:
+  enabled: true
+  host: task-management-staging.local
+  tls:
+    enabled: true
+    secretName: task-management-staging-tls
+    hosts:
+      - task-management-staging.local
+
+database:
+  pvcSize: 10Gi
+
+hpa:
+  enabled: false
+
+pdb:
+  enabled: false
+
+networkPolicy:
+  enabled: false

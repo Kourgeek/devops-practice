@@ -1,0 +1,13 @@
+apiVersion: v2
+name: task-management
+description: Multi-service task management system with task-service, notification-service, and web-ui
+type: application
+version: 1.0.0
+appVersion: "1.1.0"
+maintainers:
+  - name: devops-team
+    email: devops@example.com
+keywords:
+  - task-management
+  - devops
+  - microservices

@@ -1,0 +1,672 @@
+{{- define "task-management.name" -}}
+{{ .Chart.Name }}
+{{- end -}}
+
+{{- define "task-management.fullname" -}}
+{{ .Release.Name }}-tm
+{{- end -}}
+
+{{- define "task-management.task-service" -}}
+{{ include "task-management.fullname" . }}-task-service
+{{- end -}}
+
+{{- define "task-management.notification-service" -}}
+{{ include "task-management.fullname" . }}-notification-service
+{{- end -}}
+
+{{- define "task-management.web-ui" -}}
+{{ include "task-management.fullname" . }}-web-ui
+{{- end -}}
+
+{{- define "task-management.db" -}}
+{{ include "task-management.fullname" . }}-db
+{{- end -}}
+
+# task-service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-management.task-service" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: task-service
+    component: task-service
+    release: {{ .Release.Name }}
+spec:
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.replicaCount.taskService }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: task-service
+      component: task-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: task-service
+        component: task-service
+        release: {{ .Release.Name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.services.taskService.port }}"
+    spec:
+      containers:
+        - name: task-service
+          image: "{{ .Values.images.taskService.repository }}:{{ .Values.images.taskService.tag }}"
+          imagePullPolicy: {{ .Values.images.taskService.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.taskService.port }}
+              name: http
+              protocol: TCP
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: DB_NAME
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(DB_USER):$(DB_PASSWORD)@{{ include "task-management.db" . }}:{{ .Values.services.db.port }}/$(DB_NAME)"
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: NOTIFICATION_SERVICE_URL
+            - name: HEALTH_CHECK_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: HEALTH_CHECK_INTERVAL
+            - name: PROCESSING_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: PROCESSING_TIMEOUT
+          resources:
+            requests:
+              cpu: {{ .Values.resources.taskService.requests.cpu }}
+              memory: {{ .Values.resources.taskService.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.taskService.limits.cpu }}
+              memory: {{ .Values.resources.taskService.limits.memory }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.taskService.port }}
+            initialDelaySeconds: 15
+            periodSeconds: {{ .Values.healthCheck.interval }}
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.taskService.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.taskService.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+---
+# task-service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "task-management.task-service" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: task-service
+    component: task-service
+    release: {{ .Release.Name }}
+spec:
+  type: {{ .Values.services.taskService.type }}
+  selector:
+    app: task-service
+    component: task-service
+  ports:
+    - port: {{ .Values.services.taskService.port }}
+      targetPort: {{ .Values.services.taskService.port }}
+      protocol: TCP
+      name: http
+---
+# notification-service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-management.notification-service" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: notification-service
+    component: notification-service
+    release: {{ .Release.Name }}
+spec:
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.replicaCount.notificationService }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: notification-service
+      component: notification-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: notification-service
+        component: notification-service
+        release: {{ .Release.Name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.services.notificationService.port }}"
+    spec:
+      containers:
+        - name: notification-service
+          image: "{{ .Values.images.notificationService.repository }}:{{ .Values.images.notificationService.tag }}"
+          imagePullPolicy: {{ .Values.images.notificationService.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.notificationService.port }}
+              name: http
+              protocol: TCP
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: DB_NAME
+            - name: DATABASE_URL
+              value: "postgresql+psycopg2://$(DB_USER):$(DB_PASSWORD)@{{ include "task-management.db" . }}:{{ .Values.services.db.port }}/$(DB_NAME)_notification"
+            - name: TASK_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: TASK_SERVICE_URL
+            - name: HEALTH_CHECK_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: HEALTH_CHECK_INTERVAL
+          resources:
+            requests:
+              cpu: {{ .Values.resources.notificationService.requests.cpu }}
+              memory: {{ .Values.resources.notificationService.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.notificationService.limits.cpu }}
+              memory: {{ .Values.resources.notificationService.limits.memory }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.notificationService.port }}
+            initialDelaySeconds: 15
+            periodSeconds: {{ .Values.healthCheck.interval }}
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.notificationService.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.notificationService.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+---
+# notification-service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "task-management.notification-service" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: notification-service
+    component: notification-service
+    release: {{ .Release.Name }}
+spec:
+  type: {{ .Values.services.notificationService.type }}
+  selector:
+    app: notification-service
+    component: notification-service
+  ports:
+    - port: {{ .Values.services.notificationService.port }}
+      targetPort: {{ .Values.services.notificationService.port }}
+      protocol: TCP
+      name: http
+---
+# web-ui Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-management.web-ui" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: web-ui
+    component: web-ui
+    release: {{ .Release.Name }}
+spec:
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.replicaCount.webUI }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: web-ui
+      component: web-ui
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: web-ui
+        component: web-ui
+        release: {{ .Release.Name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.services.webUI.port }}"
+    spec:
+      containers:
+        - name: web-ui
+          image: "{{ .Values.images.webUI.repository }}:{{ .Values.images.webUI.tag }}"
+          imagePullPolicy: {{ .Values.images.webUI.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.webUI.port }}
+              name: http
+              protocol: TCP
+          env:
+            - name: TASK_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: TASK_SERVICE_URL
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: NOTIFICATION_SERVICE_URL
+            - name: HEALTH_CHECK_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-management.fullname" . }}-config
+                  key: HEALTH_CHECK_INTERVAL
+          resources:
+            requests:
+              cpu: {{ .Values.resources.webUI.requests.cpu }}
+              memory: {{ .Values.resources.webUI.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.webUI.limits.cpu }}
+              memory: {{ .Values.resources.webUI.limits.memory }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.webUI.port }}
+            initialDelaySeconds: 15
+            periodSeconds: {{ .Values.healthCheck.interval }}
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.webUI.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.webUI.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+---
+# web-ui Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "task-management.web-ui" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: web-ui
+    component: web-ui
+    release: {{ .Release.Name }}
+spec:
+  type: {{ .Values.services.webUI.type }}
+  selector:
+    app: web-ui
+    component: web-ui
+  ports:
+    - port: {{ .Values.services.webUI.port }}
+      targetPort: {{ .Values.services.webUI.port }}
+      protocol: TCP
+      name: http
+---
+{{- if .Values.database.enabled }}
+# DB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-management.db" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: postgres
+    component: db
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount.db }}
+  selector:
+    matchLabels:
+      app: postgres
+      component: db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres
+        component: db
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.database.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.services.db.port }}
+              name: postgres
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-management.fullname" . }}-secret
+                  key: POSTGRES_DB
+          resources:
+            requests:
+              cpu: {{ .Values.resources.db.requests.cpu }}
+              memory: {{ .Values.resources.db.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.db.limits.cpu }}
+              memory: {{ .Values.resources.db.limits.memory }}
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - devops
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - devops
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: {{ include "task-management.fullname" . }}-postgres-pvc
+---
+# DB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "task-management.db" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: postgres
+    component: db
+    release: {{ .Release.Name }}
+spec:
+  type: {{ .Values.services.db.type }}
+  selector:
+    app: postgres
+    component: db
+  ports:
+    - port: {{ .Values.services.db.port }}
+      targetPort: {{ .Values.services.db.port }}
+      protocol: TCP
+      name: postgres
+{{- end }}
+---
+{{- if .Values.ingress.enabled }}
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "task-management.fullname" . }}-ingress
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "task-management.web-ui" . }}
+                port:
+                  number: {{ .Values.services.webUI.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        {{- range .Values.ingress.tls.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.hpa.enabled }}
+# HPA for task-service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "task-management.task-service" . }}-hpa
+  namespace: {{ .Release.Namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "task-management.task-service" . }}
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.cpuUtilization }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.memoryUtilization }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Max
+---
+# HPA for web-ui
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "task-management.web-ui" . }}-hpa
+  namespace: {{ .Release.Namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "task-management.web-ui" . }}
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.cpuUtilization }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.memoryUtilization }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Max
+{{- end }}
+---
+{{- if .Values.pdb.enabled }}
+# PDB for task-service
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "task-management.task-service" . }}-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: task-service
+      component: task-service
+---
+# PDB for web-ui
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "task-management.web-ui" . }}-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: web-ui
+      component: web-ui
+{{- end }}
+---
+{{- if .Values.networkPolicy.enabled }}
+# Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "task-management.fullname" . }}-netpol
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.services.webUI.port }}
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}

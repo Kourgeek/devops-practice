@@ -1,0 +1,150 @@
+---
+# k8s/base/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: task-management
+  labels:
+    app: task-management
+---
+# k8s/base/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-management-config
+  namespace: task-management
+data:
+  HEALTH_CHECK_INTERVAL: "30"
+  PROCESSING_TIMEOUT: "30"
+  DB_USER: "devops"
+  DB_NAME: "taskdb"
+  POSTGRES_USER: "devops"
+  POSTGRES_DB: "taskdb"
+  TASK_SERVICE_URL: "http://task-service.task-management.svc.cluster.local:8000"
+  NOTIFICATION_SERVICE_URL: "http://notification-service.task-management.svc.cluster.local:9000"
+---
+# k8s/base/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: task-management-secret
+  namespace: task-management
+type: Opaque
+stringData:
+  DB_PASSWORD: "devops123"
+  POSTGRES_PASSWORD: "devops123"
+  DB_USER: "devops"
+  POSTGRES_USER: "devops"
+  DB_NAME: "taskdb"
+  POSTGRES_DB: "taskdb"
+---
+# k8s/base/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: task-management
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+---
+# k8s/base/task-service-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: task-service
+  namespace: task-management
+  labels:
+    app: task-service
+spec:
+  selector:
+    app: task-service
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+# k8s/base/notification-service-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: task-management
+  labels:
+    app: notification-service
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+# k8s/base/web-ui-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-ui
+  namespace: task-management
+  labels:
+    app: web-ui
+spec:
+  selector:
+    app: web-ui
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+# k8s/base/db-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: task-management
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  type: ClusterIP
+---
+# k8s/base/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: task-management-ingress
+  namespace: task-management
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-ui
+                port:
+                  number: 5000
+  tls:
+    - hosts:
+        - task-management.local
+      secretName: task-management-tls

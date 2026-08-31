@@ -1,0 +1,147 @@
+services:
+  task-service:
+    build:
+      context: ./task-service
+      dockerfile: Dockerfile
+    container_name: task-service
+    ports:
+      - 8000:8000
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      NOTIFICATION_SERVICE_URL: http://notification-service:9000
+      HEALTH_CHECK_INTERVAL: ${HEALTH_CHECK_INTERVAL}
+      PROCESSING_TIMEOUT: ${PROCESSING_TIMEOUT:-30}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - devops_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - 9000:9000
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}_notification
+      TASK_SERVICE_URL: http://task-service:8000
+      HEALTH_CHECK_INTERVAL: ${HEALTH_CHECK_INTERVAL}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - devops_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 192M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: web-ui
+    ports:
+      - 5000:5000
+    env_file:
+      - .env
+    environment:
+      TASK_SERVICE_URL: http://task-service:8000
+      NOTIFICATION_SERVICE_URL: http://notification-service:9000
+      HEALTH_CHECK_INTERVAL: ${HEALTH_CHECK_INTERVAL}
+    depends_on:
+      task-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    networks:
+      - devops_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 192M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  db:
+    image: postgres:16-alpine
+    container_name: devops-db
+    ports:
+      - 5432:5432
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - devops_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devops} -d ${POSTGRES_DB:-taskdb}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  adminer:
+    image: adminer
+    container_name: adminer
+    ports:
+      - 8080:8080
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - devops_network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+
+networks:
+  devops_network:
+    driver: bridge

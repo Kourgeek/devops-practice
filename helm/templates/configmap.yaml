@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "task-management.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "task-management.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    release: {{ .Release.Name }}
+data:
+  HEALTH_CHECK_INTERVAL: "{{ .Values.healthCheck.interval | default 30 }}"
+  PROCESSING_TIMEOUT: "{{ .Values.healthCheck.processingTimeout | default 30 }}"
+  DB_USER: "{{ .Values.database.user }}"
+  DB_NAME: "{{ .Values.database.dbName }}"
+  POSTGRES_USER: "{{ .Values.database.user }}"
+  POSTGRES_DB: "{{ .Values.database.dbName }}"
+  TASK_SERVICE_URL: "http://{{ include "task-management.fullname" . }}-task-service.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.services.taskService.port }}"
+  NOTIFICATION_SERVICE_URL: "http://{{ include "task-management.fullname" . }}-notification-service.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.services.notificationService.port }}"

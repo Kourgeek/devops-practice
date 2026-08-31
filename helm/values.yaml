@@ -1,0 +1,121 @@
+# Default values for task-management.
+# Override via: helm install task-management . -f values-prod.yaml
+# or: helm upgrade task-management . --set replicaCount.taskService=3
+
+namespace:
+  create: true
+  name: task-management
+
+# ---- Image settings ----
+images:
+  taskService:
+    repository: task-management/task-service
+    tag: "1.1.0"
+    pullPolicy: Always
+  notificationService:
+    repository: task-management/notification-service
+    tag: "1.1.0"
+    pullPolicy: Always
+  webUI:
+    repository: task-management/web-ui
+    tag: "1.1.0"
+    pullPolicy: Always
+
+# ---- Replica counts ----
+replicaCount:
+  taskService: 1
+  notificationService: 1
+  webUI: 1
+  db: 1
+
+# ---- Resource limits ----
+resources:
+  taskService:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  notificationService:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "192Mi"
+  webUI:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "192Mi"
+  db:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ---- Database ----
+database:
+  enabled: true
+  image: postgres:16-alpine
+  storageClass: standard
+  pvcSize: 5Gi
+  user: devops
+  password: devops123
+  dbName: taskdb
+
+# ---- Service settings ----
+services:
+  taskService:
+    port: 8000
+    type: ClusterIP
+  notificationService:
+    port: 9000
+    type: ClusterIP
+  webUI:
+    port: 5000
+    type: ClusterIP
+  db:
+    port: 5432
+    type: ClusterIP
+
+# ---- Ingress ----
+ingress:
+  enabled: true
+  className: nginx
+  host: task-management.local
+  tls:
+    enabled: true
+    secretName: task-management-tls
+    hosts:
+      - task-management.local
+
+# ---- Health checks ----
+healthCheck:
+  interval: 30
+  processingTimeout: 30
+
+# ---- HPA (Horizontal Pod Autoscaler) ----
+hpa:
+  enabled: false
+  minReplicas: 3
+  maxReplicas: 10
+  cpuUtilization: 70
+  memoryUtilization: 80
+
+# ---- Pod Disruption Budget ----
+pdb:
+  enabled: false
+  minAvailable: 2
+
+# ---- Network Policy ----
+networkPolicy:
+  enabled: false
+
+# ---- Environment ----
+environment: dev
