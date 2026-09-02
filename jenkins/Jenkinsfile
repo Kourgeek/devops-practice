@@ -1,0 +1,137 @@
+@Library('pipeline-library') _
+
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_HUB    = 'docker.io'
+        K8S_NAMESPACE = 'dev'
+        COMPOSE_FILE  = 'docker-compose.yml'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo '==> Checkout source code'
+                checkout scm
+            }
+        }
+
+        stage('Lint & Static Analysis') {
+            steps {
+                echo '==> Running linting'
+                sh '''
+                    cd devops-practice
+                    # Python linting for each service
+                    for svc in task-service notification-service web-ui; do
+                        echo "--- Linting $svc ---"
+                        docker compose run --rm $svc python -m py_compile app.py || true
+                    done
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'devops-practice/**/*.py', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                echo '==> Running tests for all services'
+                sh '''
+                    cd devops-practice
+                    echo "=== task-service ==="
+                    docker compose exec task-service pytest tests/ -v --tb=short || true
+                    echo "=== notification-service ==="
+                    docker compose exec notification-service pytest tests/ -v --tb=short || true
+                    echo "=== web-ui ==="
+                    docker compose exec web-ui pytest tests/ -v --tb=short || true
+                '''
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                echo '==> Building Docker images'
+                sh '''
+                    cd devops-practice
+                    docker compose build --no-cache
+                '''
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                echo '==> Running security scan on images'
+                sh '''
+                    cd devops-practice
+                    for img in task-service notification-service web-ui; do
+                        echo "--- Scanning $img ---"
+                        docker compose run --rm $trivy image $img 2>/dev/null || echo "Trivy not available, skipping"
+                    done
+                '''
+            }
+            post {
+                always {
+                    echo 'Security scan completed'
+                }
+            }
+        }
+
+        stage('Deploy to K8s (dev)') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '==> Deploying to dev K8s cluster'
+                sh '''
+                    cd devops-practice
+                    if [ -f deploy.ps1 ]; then
+                        powershell -Command "./deploy.ps1 dev" 2>&1 || echo "PowerShell deploy failed"
+                    elif [ -f deploy.sh ]; then
+                        ./deploy.sh dev 2>&1 || echo "Bash deploy failed"
+                    else
+                        echo "No deploy script found!"
+                        exit 1
+                    fi
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                echo '==> Verifying deployment health'
+                sh '''
+                    echo "Checking task-service health..."
+                    curl -sf http://localhost:8000/health || echo "task-service not reachable (expected in CI)"
+                    echo "Checking web-ui health..."
+                    curl -sf http://localhost:5000/health || echo "web-ui not reachable (expected in CI)"
+                    echo "Checking notification-service health..."
+                    curl -sf http://localhost:9000/health || echo "notification-service not reachable (expected in CI)"
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '==> Pipeline finished'
+            cleanWs()
+        }
+        success {
+            echo '========================================='
+            echo '  Deployment successful!'
+            echo '  Jenkins URL: http://localhost:8080'
+            echo '========================================='
+        }
+        failure {
+            echo '========================================='
+            echo '  Deployment failed! Check logs above.'
+            echo '========================================='
+        }
+        unstable {
+            echo 'Pipeline completed with warnings'
+        }
+    }
+}

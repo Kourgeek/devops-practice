@@ -1,0 +1,16 @@
+# Secrets & Credentials
+passwords_conf.md
+*.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# K8s & Docker tmp
+*.log

@@ -1,0 +1,12 @@
+# Base plugins (pre-installed with jenkins/jenkins:lts-jdk17)
+# Additional plugins to install:
+pipeline-stage-view
+git
+docker
+kubernetes
+credentials-binding
+jackson2
+sonar
+workflow-aggregator
+job-dsl
+blueocean

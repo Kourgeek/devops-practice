@@ -1,0 +1,19 @@
+services:
+  secman:
+    build:
+      context: ./secman
+      dockerfile: Dockerfile
+      args:
+        - DEV_MODE=true
+    volumes:
+      - ./secman:/app
+    environment:
+      - FLASK_DEBUG=1
+      - FLASK_ENV=development
+      - SECMAN_DEBUG=true
+      - RELOAD=true
+    command: >
+      sh -c "
+        pip install -e . 2>/dev/null;
+        gunicorn --bind 0.0.0.0:9090 --workers 1 --reload --timeout 120 app:app
+      "

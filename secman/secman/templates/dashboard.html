@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secman — Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #0f0c29;
+            --bg-secondary: #1a1a2e;
+            --bg-card: rgba(255,255,255,0.05);
+            --bg-hover: rgba(255,255,255,0.08);
+            --border: rgba(255,255,255,0.1);
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --accent: #667eea;
+            --accent-hover: #7c8ff5;
+            --danger: #ef4444;
+            --danger-hover: #f87171;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* ---- Header ---- */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-logo {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-badge {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            padding: 6px 14px; border-radius: 20px; font-size: 0.85rem;
+        }
+        .user-badge .avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem; font-weight: 700; color: white;
+        }
+        .btn-logout {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-secondary); padding: 6px 16px; border-radius: 6px;
+            cursor: pointer; font-size: 0.85rem; transition: all 0.2s;
+        }
+        .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* ---- Main ---- */
+        .main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        /* ---- Toolbar ---- */
+        .toolbar {
+            display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px;
+            font-size: 0.9rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2); color: white;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-secondary {
+            background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
+        }
+        .btn-secondary:hover { background: var(--bg-hover); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: var(--danger-hover); }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+        /* ---- Search ---- */
+        .search-box {
+            flex: 1; min-width: 200px; position: relative;
+        }
+        .search-box input {
+            width: 100%; padding: 10px 16px 10px 40px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text-primary); font-size: 0.9rem;
+        }
+        .search-box input:focus { outline: none; border-color: var(--accent); }
+        .search-box input::placeholder { color: #555; }
+        .search-box .search-icon {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: #555; font-size: 1rem;
+        }
+
+        /* ---- Stats ---- */
+        .stats {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px; text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem; font-weight: 700;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .stat-label { color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px; }
+
+        /* ---- Tabs ---- */
+        .tabs {
+            display: flex; gap: 4px; margin-bottom: 20px;
+            background: var(--bg-card); border-radius: 10px; padding: 4px;
+            border: 1px solid var(--border); width: fit-content;
+        }
+        .tab {
+            padding: 8px 20px; border: none; background: transparent;
+            color: var(--text-secondary); font-size: 0.9rem; cursor: pointer;
+            border-radius: 8px; transition: all 0.2s;
+        }
+        .tab.active { background: var(--accent); color: white; }
+        .tab:hover:not(.active) { color: var(--text-primary); }
+
+        /* ---- Table ---- */
+        .table-container {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left; padding: 14px 20px;
+            background: rgba(255,255,255,0.03); color: var(--text-secondary);
+            font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 14px 20px; border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: var(--bg-hover); }
+        .secret-key {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--accent); font-weight: 500;
+        }
+        .secret-value {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--text-secondary); font-size: 0.85rem;
+        }
+        .secret-value .masked { color: #555; }
+        .actions { display: flex; gap: 8px; }
+        .btn-icon {
+            width: 32px; height: 32px; border: 1px solid var(--border);
+            background: transparent; color: var(--text-secondary);
+            border-radius: 6px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-icon.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* ---- Pagination ---- */
+        .pagination {
+            display: flex; justify-content: center; align-items: center;
+            gap: 8px; padding: 16px; border-top: 1px solid var(--border);
+        }
+        .page-btn {
+            padding: 6px 12px; border: 1px solid var(--border);
+            background: transparent; color: var(--text-secondary);
+            border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+        .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .page-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        /* ---- Modal ---- */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6); z-index: 200;
+            align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 16px; padding: 32px; width: 100%; max-width: 500px;
+            margin: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+        .modal h2 {
+            font-size: 1.3rem; margin-bottom: 24px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .modal .form-group { margin-bottom: 16px; }
+        .modal label {
+            display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary);
+        }
+        .modal input, .modal textarea {
+            width: 100%; padding: 10px 14px;
+            background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text-primary); font-size: 0.9rem;
+            font-family: inherit;
+        }
+        .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--accent); }
+        .modal textarea { resize: vertical; min-height: 80px; }
+        .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+
+        /* ---- Toast ---- */
+        .toast-container {
+            position: fixed; top: 80px; right: 24px; z-index: 300;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+            padding: 12px 20px; border-radius: 8px; font-size: 0.9rem;
+            animation: slideIn 0.3s ease; min-width: 280px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .toast.success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #86efac; }
+        .toast.error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+        .toast.info { background: rgba(102,126,234,0.15); border: 1px solid rgba(102,126,234,0.3); color: #a5b4fc; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* ---- Audit log ---- */
+        .audit-entry {
+            padding: 12px 20px; border-bottom: 1px solid var(--border);
+            font-size: 0.85rem; display: flex; gap: 16px; align-items: center;
+        }
+        .audit-entry:last-child { border-bottom: none; }
+        .audit-action {
+            padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;
+            font-weight: 600; text-transform: uppercase; min-width: 70px; text-align: center;
+        }
+        .audit-action.CREATE { background: rgba(34,197,94,0.15); color: #86efac; }
+        .audit-action.UPDATE { background: rgba(245,158,11,0.15); color: #fcd34d; }
+        .audit-action.DELETE { background: rgba(239,68,68,0.15); color: #fca5a5; }
+        .audit-action.READ { background: rgba(102,126,234,0.15); color: #a5b4fc; }
+        .audit-action.IMPORT { background: rgba(168,85,247,0.15); color: #d8b4fe; }
+        .audit-action.LOGIN { background: rgba(34,197,94,0.15); color: #86efac; }
+        .audit-action.LOGIN_FAILED { background: rgba(239,68,68,0.15); color: #fca5a5; }
+        .audit-action.REGISTER { background: rgba(102,126,234,0.15); color: #a5b4fc; }
+        .audit-resource { color: var(--text-secondary); flex: 1; }
+        .audit-time { color: #555; font-size: 0.8rem; white-space: nowrap; }
+
+        /* ---- Empty state ---- */
+        .empty-state {
+            text-align: center; padding: 60px 20px; color: var(--text-secondary);
+        }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+        .empty-state p { font-size: 1rem; }
+
+        /* ---- Loading ---- */
+        .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .spinner {
+            width: 40px; height: 40px; border: 3px solid var(--border);
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 768px) {
+            .header { padding: 0 16px; }
+            .main { padding: 16px; }
+            .toolbar { flex-direction: column; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            th, td { padding: 10px 12px; font-size: 0.8rem; }
+            .secret-value { display: none; }
+            .modal { padding: 24px; margin: 8px; }
+        }
+        @media (max-width: 480px) {
+            .stats { grid-template-columns: 1fr; }
+            .tabs { width: 100%; }
+            .tab { flex: 1; text-align: center; padding: 8px 12px; font-size: 0.8rem; }
+        }
+
+        /* ---- Tab content ---- */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ---- Copy button ---- */
+        .copy-btn {
+            background: none; border: none; color: var(--text-secondary);
+            cursor: pointer; font-size: 0.8rem; padding: 2px 6px;
+            border-radius: 4px; transition: all 0.2s;
+        }
+        .copy-btn:hover { color: var(--accent); background: var(--bg-hover); }
+
+        /* ---- Value toggle ---- */
+        .value-masked { color: #555; letter-spacing: 2px; }
+        .value-visible { color: var(--text-primary); }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <span class="header-logo">🔐 Secman</span>
+        </div>
+        <div class="header-right">
+            <div class="user-badge">
+                <div class="avatar" id="userAvatar"></div>
+                <span id="userName"></span>
+            </div>
+            <button class="btn-logout" onclick="logout()">Выход</button>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main">
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-label">Всего секретов</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statToday">0</div>
+                <div class="stat-label">Создано сегодня</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statAudit">0</div>
+                <div class="stat-label">Записей аудита</div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <button class="btn btn-primary" onclick="openModal()">＋ Добавить секрет</button>
+            <button class="btn btn-secondary" onclick="importFromJenkins()">📥 Импорт из Jenkins</button>
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Поиск по названию..." oninput="searchSecrets()">
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('secrets')">Секреты</button>
+            <button class="tab" onclick="switchTab('audit')">Аудит</button>
+        </div>
+
+        <!-- Secrets Tab -->
+        <div class="tab-content active" id="tab-secrets">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Описание</th>
+                            <th>Значение</th>
+                            <th>Создан</th>
+                            <th style="width:120px">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="secretsBody">
+                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Загрузка...</td></tr>
+                    </tbody>
+                </table>
+                <div class="pagination" id="pagination"></div>
+            </div>
+        </div>
+
+        <!-- Audit Tab -->
+        <div class="tab-content" id="tab-audit">
+            <div class="table-container" id="auditContainer">
+                <div class="loading"><div class="spinner"></div>Загрузка...</div>
+            </div>
+            <div class="pagination" id="auditPagination"></div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="secretModal">
+        <div class="modal">
+            <h2 id="modalTitle">Добавить секрет</h2>
+            <form id="secretForm">
+                <input type="hidden" id="editId">
+                <div class="form-group">
+                    <label for="secretKey">Название (ключ)</label>
+                    <input type="text" id="secretKey" required placeholder="DATABASE_URL">
+                </div>
+                <div class="form-group">
+                    <label for="secretValue">Значение</label>
+                    <textarea id="secretValue" required placeholder="secret-value-here"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="secretDesc">Описание</label>
+                    <input type="text" id="secretDesc" placeholder="Опционально">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary" id="modalSubmitBtn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal">
+            <h2>Импорт из Jenkins</h2>
+            <form id="importForm">
+                <div class="form-group">
+                    <label for="importData">JSON с credentials</label>
+                    <textarea id="importData" rows="8" placeholder='{"credentials":[{"id":"my-cred","username":"user","password":"pass","description":"desc"}]}'></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Импортировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

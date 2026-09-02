@@ -1,0 +1,10 @@
+# Development overrides — applied automatically by Docker Compose
+services:
+  jenkins:
+    volumes:
+      - ./jenkins/config:/var/jenkins_home/init.groovy.d:ro
+    environment:
+      - JAVA_OPTS=-Dhudson.model.DirectoryBrowserSupport.CSP= -Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true
+      - JPDA_ENABLED=false
+    ports:
+      - "5005:5005"
